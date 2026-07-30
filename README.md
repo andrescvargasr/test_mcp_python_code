@@ -30,6 +30,36 @@ python control_led.py [action] [mdns] [port] [--list-tools]
 
 ---
 
+## Connection Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as Python Client (control_led.py)
+    participant Server as MCP Server (http://mcp-led.local:8080/mcp)
+
+    Note over Client, Server: 1. Session Initialization
+    Client->>Server: POST /mcp (initialize)<br/>{"jsonrpc":"2.0", "id":0, "method":"initialize"}
+    Server-->>Client: 200 OK (Mcp-Session-Id, protocolVersion)
+
+    Note over Client, Server: 2. Initialized Notification
+    Client->>Server: POST /mcp (notifications/initialized)<br/>Headers: Mcp-Session-Id, Mcp-Protocol-Version
+
+    opt Optional: List Tools (--list-tools / action: list)
+        Note over Client, Server: 3. Query Available Tools
+        Client->>Server: POST /mcp (tools/list)<br/>{"jsonrpc":"2.0", "id":1, "method":"tools/list"}
+        Server-->>Client: 200 OK (tools list & schemas)
+    end
+
+    opt Optional: Execute LED Control Action (on/off/toggle/red/green/blue)
+        Note over Client, Server: 4. Call LED Control Tool
+        Client->>Server: POST /mcp (tools/call)<br/>{"jsonrpc":"2.0", "id":2, "method":"tools/call", "params":{"name":"led_control", ...}}
+        Server-->>Client: 200 OK (result content)
+    end
+```
+
+---
+
 ## Usage Examples
 
 ### Listing Available Tools (`tools/list`)
