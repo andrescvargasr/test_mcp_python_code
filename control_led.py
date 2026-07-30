@@ -4,7 +4,7 @@ import sys
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python control_led.py [on|off|toggle|red|green|blue]")
+        print("Usage: python control_led.py [on|off|toggle|red|green|blue] [mdns] [port]")
         sys.exit(1)
 
     action = sys.argv[1].lower()
@@ -13,7 +13,10 @@ def main():
         print(f"Error: Invalid action '{sys.argv[1]}'. Choose from: {', '.join(valid_actions)}")
         sys.exit(1)
 
-    url = "http://mcp-led.local:8080/mcp"
+    mdns = sys.argv[2] if len(sys.argv) > 2 else "mcp-led"
+    port = sys.argv[3] if len(sys.argv) > 3 else "8080"
+    url = f"http://{mdns}.local:{port}/mcp"
+
     protocol_version = "2025-11-25"
 
     # 1. Initialize session
