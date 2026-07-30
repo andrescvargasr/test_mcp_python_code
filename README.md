@@ -1,5 +1,8 @@
 # LED Control Client (MCP)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![MCP](https://img.shields.io/badge/Protocol-MCP-red)](https://modelcontextprotocol.io/)
+
 Python script to control an LED device using the **Model Context Protocol (MCP)** over HTTP/JSON-RPC.
 
 ## Features
