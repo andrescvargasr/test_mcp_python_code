@@ -17,7 +17,7 @@ def main():
     port = sys.argv[3] if len(sys.argv) > 3 else "8080"
     url = f"http://{mdns}.local:{port}/mcp"
 
-    protocol_version = "2025-11-25"
+    # protocol_version = "2025-11-25"
 
     # 1. Initialize session
     init_payload = {
@@ -25,7 +25,7 @@ def main():
         "id": 0,
         "method": "initialize",
         "params": {
-            "protocolVersion": protocol_version,
+            # "protocolVersion": protocol_version,
             "capabilities": {},
             "clientInfo": {
                 "name": "antigravity-client",
@@ -39,13 +39,15 @@ def main():
         data=json.dumps(init_payload).encode('utf-8'),
         headers={
             "Content-Type": "application/json",
-            "Mcp-Protocol-Version": protocol_version
+            # "Mcp-Protocol-Version": protocol_version
         },
         method="POST"
     )
 
     try:
         with urllib.request.urlopen(req) as response:
+            body = json.loads(response.read().decode('utf-8'))
+            protocol_version = body["result"]["protocolVersion"]
             headers = response.info()
             session_id = headers.get("Mcp-Session-Id")
     except Exception as e:
