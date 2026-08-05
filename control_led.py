@@ -1,3 +1,4 @@
+import argparse
 import urllib.request
 import json
 import sys
@@ -43,40 +44,85 @@ def fetch_tools_list(url, session_id, protocol_version, req_id=1):
 
 def main():
     valid_actions = ["on", "off", "toggle", "red", "green", "blue", "list"]
-    flag_aliases = ["--list-tools", "--list", "-l"]
 
-    list_tools_flag = False
-    args = []
-    for arg in sys.argv[1:]:
-        if arg in flag_aliases:
-            list_tools_flag = True
+    parser = argparse.ArgumentParser(
+        description="Control Zephyr LED strip using MCP.",
+        usage="python control_led.py [action] [mdns] [port] [--list-tools] [options]"
+    )
+
+    # Optional flags for LED controls (from control_led_2)
+    parser.add_argument("--action", type=str, help="LED action (on, off, toggle, red, green, blue, list)")
+    parser.add_argument("--r", type=int, help="Red channel (0-255)")
+    parser.add_argument("--g", type=int, help="Green channel (0-255)")
+    parser.add_argument("--b", type=int, help="Blue channel (0-255)")
+    parser.add_argument("--color", type=str, help="Color string, e.g., 'rgb(255,0,0)'")
+    parser.add_argument("--rainbow", action="store_true", help="Enable rainbow effect")
+
+    # Connection flags
+    parser.add_argument("--mdns", type=str, help="mDNS hostname prefix (default: mcp-led)")
+    parser.add_argument("--port", type=str, help="Target server HTTP port (default: 8080)")
+
+    # List tools flag (from control_led)
+    parser.add_argument("--list-tools", "-l", "--list", dest="list_tools", action="store_true", help="Fetch and display available tools from server")
+
+    # Positional arguments (from control_led)
+    parser.add_argument("pos_arg1", nargs="?", default=None, help="Action or mDNS hostname")
+    parser.add_argument("pos_arg2", nargs="?", default=None, help="mDNS hostname or Port")
+    parser.add_argument("pos_arg3", nargs="?", default=None, help="Port")
+
+    args = parser.parse_args()
+
+    action = args.action
+    mdns = args.mdns
+    port = args.port
+    list_tools_flag = args.list_tools
+
+    pos_mdns = None
+    pos_port = None
+
+    if args.pos_arg1:
+        first_arg = args.pos_arg1.lower()
+        if first_arg in valid_actions:
+            if not action:
+                action = first_arg
+            pos_mdns = args.pos_arg2
+            pos_port = args.pos_arg3
+        elif list_tools_flag or args.r is not None or args.g is not None or args.b is not None or args.color or args.rainbow:
+            pos_mdns = args.pos_arg1
+            pos_port = args.pos_arg2
         else:
-            args.append(arg)
+            print(f"Error: Invalid action '{args.pos_arg1}'. Choose from: {', '.join(valid_actions)} (or use --list-tools)")
+            sys.exit(1)
+    elif args.pos_arg2:
+        pos_mdns = args.pos_arg2
+        pos_port = args.pos_arg3
 
-    if not list_tools_flag and len(args) == 0:
-        print("Usage: python control_led.py [on|off|toggle|red|green|blue|list] [mdns] [port] [--list-tools]")
+    if not mdns:
+        mdns = pos_mdns if pos_mdns else "mcp-led"
+    if not port:
+        port = pos_port if pos_port else "8080"
+
+    # Build the arguments dictionary for the tool call
+    tool_args = {}
+    if action and action != "list":
+        tool_args["action"] = action
+    if args.r is not None:
+        tool_args["r"] = args.r
+    if args.g is not None:
+        tool_args["g"] = args.g
+    if args.b is not None:
+        tool_args["b"] = args.b
+    if args.color:
+        tool_args["color"] = args.color
+    if args.rainbow:
+        tool_args["rainbow"] = True
+
+    if not list_tools_flag and action != "list" and not tool_args:
+        parser.print_help()
         sys.exit(1)
 
-    action = None
-    mdns = "mcp-led"
-    port = "8080"
-
-    if len(args) > 0:
-        first_arg = args[0].lower()
-        if first_arg in valid_actions:
-            action = first_arg
-            mdns = args[1] if len(args) > 1 else "mcp-led"
-            port = args[2] if len(args) > 2 else "8080"
-        elif list_tools_flag:
-            mdns = args[0]
-            port = args[1] if len(args) > 1 else "8080"
-        else:
-            print(f"Error: Invalid action '{args[0]}'. Choose from: {', '.join(valid_actions)} (or use --list-tools)")
-            sys.exit(1)
-
     url = f"http://{mdns}.local:{port}/mcp"
-
-    # protocol_version = "2025-11-25"
+    protocol_version = "2025-11-25"
 
     # 1. Initialize session
     init_payload = {
@@ -84,7 +130,7 @@ def main():
         "id": 0,
         "method": "initialize",
         "params": {
-            # "protocolVersion": protocol_version,
+            "protocolVersion": protocol_version,
             "capabilities": {},
             "clientInfo": {
                 "name": "antigravity-client",
@@ -98,7 +144,7 @@ def main():
         data=json.dumps(init_payload).encode('utf-8'),
         headers={
             "Content-Type": "application/json",
-            # "Mcp-Protocol-Version": protocol_version
+            "Mcp-Protocol-Version": protocol_version
         },
         method="POST"
     )
@@ -106,7 +152,8 @@ def main():
     try:
         with urllib.request.urlopen(req) as response:
             body = json.loads(response.read().decode('utf-8'))
-            protocol_version = body["result"]["protocolVersion"]
+            if "result" in body and "protocolVersion" in body["result"]:
+                protocol_version = body["result"]["protocolVersion"]
             headers = response.info()
             session_id = headers.get("Mcp-Session-Id")
     except Exception as e:
@@ -117,7 +164,7 @@ def main():
         print("Error: No Mcp-Session-Id header returned!")
         sys.exit(1)
 
-    print("Protocol Version: ",protocol_version)
+    print("Protocol Version:", protocol_version)
 
     # 2. Send initialized notification
     notif_payload = {
@@ -147,17 +194,15 @@ def main():
         fetch_tools_list(url, session_id, protocol_version, req_id=req_id)
         req_id += 1
 
-    # 4. Call tool led_control if action is a standard LED action (not 'list' or None)
-    if action and action != "list":
+    # 4. Call tool led_control with the built arguments
+    if tool_args:
         tool_payload = {
             "jsonrpc": "2.0",
             "id": req_id,
             "method": "tools/call",
             "params": {
                 "name": "led_control",
-                "arguments": {
-                    "action": action
-                }
+                "arguments": tool_args
             }
         }
         req_tool = urllib.request.Request(
