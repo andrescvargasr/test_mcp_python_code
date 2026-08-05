@@ -1,122 +1,102 @@
-# LED Control Client (MCP)
+# MCP LED Control Clients
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![MCP](https://img.shields.io/badge/Protocol-MCP-red)](https://modelcontextprotocol.io/)
+[![Python](https://img.shields.io/badge/Python-3.x-blue.svg)](python/README.md)
+[![Rust](https://img.shields.io/badge/Rust-2024-orange.svg)](rust/README.md)
 
-Python script to control an LED device using the **Model Context Protocol (MCP)** over HTTP/JSON-RPC.
-
-## Features
-
-- Communicates with MCP server over HTTP JSON-RPC 2.0.
-- Supports turning the LED **on** / **off**, **toggling** state, and setting preset colors (**red**, **green**, **blue**).
-- Supports custom RGB channels (`--r`, `--g`, `--b`), CSS color strings (`--color`), and rainbow effect (`--rainbow`).
-- Supports querying available tools via `tools/list` using the `list` action or `--list-tools` (`-l`, `--list`) flag.
-- Supports positional arguments or explicit `--mdns` and `--port` connection flags.
-- Uses Python standard libraries (`urllib`, `json`, `argparse`) with no extra dependencies needed.
-
-## Command Syntax
-
-```bash
-python control_led.py [action] [mdns] [port] [options]
-```
-
-### Arguments & Flags
-
-| Argument / Flag | Required | Default | Description |
-| --- | --- | --- | --- |
-| `[action]` / `--action` | No* | — | LED action: `on`, `off`, `toggle`, `red`, `green`, `blue`, `list` (*Required if `--list-tools`, RGB, color, or rainbow options are not passed) |
-| `[mdns]` / `--mdns` | No | `mcp-led` | Hostname prefix for target device (`http://{mdns}.local:{port}/mcp`) |
-| `[port]` / `--port` | No | `8080` | Target server HTTP port |
-| `--list-tools` / `-l` / `--list` | No | `false` | Optional flag to fetch and display available tools from the server via `tools/list` |
-| `--r` | No | — | Red channel intensity (`0-255`) |
-| `--g` | No | — | Green channel intensity (`0-255`) |
-| `--b` | No | — | Blue channel intensity (`0-255`) |
-| `--color` | No | — | Color string (e.g., `'rgb(255,0,0)'`) |
-| `--rainbow` | No | `false` | Enable rainbow animation effect |
+Multi-language client applications for controlling LED hardware and devices over HTTP using the **Model Context Protocol (MCP)** JSON-RPC 2.0 specification.
 
 ---
 
-## Connection Sequence Diagram
+## 📁 Repository Overview
+
+This repository contains client implementations in multiple programming languages to interact with an MCP-compatible LED server:
+
+| Folder | Language | Dependencies | Description | README |
+| --- | --- | --- | --- | --- |
+| [`python/`](python/) | Python 3 | None (Standard Library) | Lightweight, portable CLI client | [Python Guide](python/README.md) |
+| [`rust/`](rust/) | Rust | `reqwest`, `serde`, `serde_json` | High-performance, type-safe CLI client | [Rust Guide](rust/README.md) |
+
+---
+
+## ✨ Supported Features
+
+Both client implementations support full LED control capability:
+
+- 🔄 **Session Management**: Automated MCP initialization handshake (`initialize` -> `notifications/initialized`) with HTTP header tracking (`Mcp-Session-Id`, `Mcp-Protocol-Version`).
+- 💡 **Basic Controls**: Turn LED `on`, `off`, or `toggle` power state.
+- 🎨 **Preset Colors**: Quick color shortcuts for `red`, `green`, and `blue`.
+- 🎛️ **Custom RGB & CSS Colors**: Pass precise RGB channel values (`0-255`) or CSS color strings.
+- 🌈 **Animations**: Enable rainbow color cycles.
+- 🔍 **Tool Discovery**: Query available server tools via `tools/list` *(Python implementation)*.
+
+---
+
+## 🔌 Protocol Sequence Diagram
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Client as Python Client (control_led.py)
+    participant Client as MCP Client (Python / Rust)
     participant Server as MCP Server (http://mcp-led.local:8080/mcp)
 
     Note over Client, Server: 1. Session Initialization
     Client->>Server: POST /mcp (initialize)<br/>{"jsonrpc":"2.0", "id":0, "method":"initialize"}
-    Server-->>Client: 200 OK (Mcp-Session-Id, protocolVersion)
+    Server-->>Client: 200 OK (Headers: Mcp-Session-Id, Mcp-Protocol-Version)
 
     Note over Client, Server: 2. Initialized Notification
     Client->>Server: POST /mcp (notifications/initialized)<br/>Headers: Mcp-Session-Id, Mcp-Protocol-Version
 
-    opt Optional: List Tools (--list-tools / action: list)
+    opt Optional: Tool Discovery
         Note over Client, Server: 3. Query Available Tools
         Client->>Server: POST /mcp (tools/list)<br/>{"jsonrpc":"2.0", "id":1, "method":"tools/list"}
-        Server-->>Client: 200 OK (tools list & schemas)
+        Server-->>Client: 200 OK (Tools list & schemas)
     end
 
-    opt Optional: Execute LED Control Action / Custom Colors
-        Note over Client, Server: 4. Call LED Control Tool
-        Client->>Server: POST /mcp (tools/call)<br/>{"jsonrpc":"2.0", "id":2, "method":"tools/call", "params":{"name":"led_control", "arguments":{...}}}
-        Server-->>Client: 200 OK (result content)
-    end
+    Note over Client, Server: 4. Execute LED Control Tool
+    Client->>Server: POST /mcp (tools/call)<br/>{"jsonrpc":"2.0", "id":2, "method":"tools/call", "params":{"name":"led_control", "arguments":{...}}}
+    Server-->>Client: 200 OK (Execution result)
 ```
 
 ---
 
-## Usage Examples
+## 🚀 Quick Start
 
-### Listing Available Tools (`tools/list`)
+### Python Client
 
-```bash
-# List tools using the 'list' action
-python control_led.py list
-
-# List tools using the optional flag
-python control_led.py --list-tools
-
-# List tools on a custom server
-python control_led.py --list-tools my-custom-led 9090
-```
-
-### Standard Commands (Default Host: `http://mcp-led.local:8080/mcp`)
+Navigate to the `python/` directory and run:
 
 ```bash
-# Turn LED ON / OFF / Toggle
-python control_led.py on
-python control_led.py off
-python control_led.py toggle
+# Basic action
+python python/control_led.py toggle
 
-# Set LED color to Red, Green, or Blue
-python control_led.py red
-python control_led.py green
-python control_led.py blue
+# Preset color
+python python/control_led.py red
+
+# Rainbow animation
+python python/control_led.py --rainbow
 ```
 
-### Advanced Color & Animation Controls
+For full options and documentation, see [python/README.md](python/README.md).
+
+### Rust Client
+
+Navigate to the `rust/` directory and run:
 
 ```bash
-# Custom RGB values
-python control_led.py --r 255 --g 128 --b 0
+# Run with Cargo
+cd rust
+cargo run -- toggle
 
-# Custom CSS Color String
-python control_led.py --color "rgb(255,0,0)"
-
-# Enable Rainbow Effect
-python control_led.py --rainbow
+# Set custom RGB
+cargo run -- --r 255 --g 128 --b 0
 ```
 
-### Custom Server Hostname & Port
+For full options and documentation, see [rust/README.md](rust/README.md).
 
-```bash
-# Custom mDNS hostname (connects to http://my-custom-led.local:8080/mcp)
-python control_led.py toggle my-custom-led
+---
 
-# Custom mDNS hostname and port via positional arguments
-python control_led.py toggle my-custom-led 9090
+## 📄 License
 
-# Custom server via explicit connection flags
-python control_led.py --rainbow --mdns my-custom-led --port 9090
-```
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.
